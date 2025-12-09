@@ -20,7 +20,7 @@ public:
 private:
     // 内部逻辑步骤
     bool initAdapter();
-    void scanAndSelectDevice();
+    bool scanAndSelectDevice(); // 返回 true 表示选到了设备
     bool connectDevice();
     void startMonitoring();
 
@@ -28,6 +28,7 @@ private:
     long long millis();
     uint16_t getUnsignedValue(const uint8_t* data, int offset);
     int16_t getSignedValue(const uint8_t* data, int offset);
+    void printHex(const uint8_t* data, int length); // 新增：打印原始数据
 
     // 数据回调
     void onDataReceived(SimpleBLE::ByteArray bytes);
@@ -38,9 +39,13 @@ private:
     SimpleBLE::Peripheral m_targetDevice;
 
     // 状态控制
-    static std::atomic<bool> s_running; // 静态变量以便信号处理访问
+    static std::atomic<bool> s_running;
     std::atomic<long long> m_lastDataTime{ 0 };
     std::mutex m_printMutex;
+
+    // 选中的设备地址，用于重连
+    std::string m_targetAddress;
+    bool m_autoReconnect = false;
 
     // 配置常量
     const std::string TARGET_UUID_SUBSTRING = "1828";
