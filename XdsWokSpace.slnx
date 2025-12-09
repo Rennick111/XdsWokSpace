@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="XdsWokSpace/XdsWokSpace.vcxproj" Id="b7d7793d-b1bb-437b-a04f-ff61b0cbea2f" />
+</Solution>

@@ -1,0 +1,97 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="源文件">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="头文件">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="资源文件">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="fmt">
+      <UniqueIdentifier>{7ab5af8d-eadd-40b1-869f-a02d79ac9122}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SimpleBLE">
+      <UniqueIdentifier>{5c024260-70e5-4773-a9d2-d55e28541536}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CommonBase">
+      <UniqueIdentifier>{37d10126-1ffe-4db0-97e1-e21f06d19703}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="XdsPowerMonitor.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\fmt\src\format.cc">
+      <Filter>fmt</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\fmt\src\os.cc">
+      <Filter>fmt</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\Exceptions.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\Logging.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\builders\AdapterBuilder.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\builders\CharacteristicBuilder.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\builders\DescriptorBuilder.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\builders\PeripheralBuilder.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\builders\ServiceBuilder.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\frontends\base\Adapter.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\frontends\base\Characteristic.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\frontends\base\Descriptor.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\frontends\base\Peripheral.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\frontends\base\Service.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\frontends\safe\AdapterSafe.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\frontends\safe\PeripheralSafe.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\backends\windows\AdapterBase.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\backends\windows\PeripheralBase.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\backends\windows\Utils.cpp">
+      <Filter>SimpleBLE</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\backends\common\CharacteristicBase.cpp">
+      <Filter>CommonBase</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\backends\common\DescriptorBase.cpp">
+      <Filter>CommonBase</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\simpleble\src\backends\common\ServiceBase.cpp">
+      <Filter>CommonBase</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

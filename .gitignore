@@ -1,0 +1,16 @@
+# Visual Studio 临时文件
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# 构建输出目录
+x64/
+Debug/
+Release/
+
+# 其它不需要的文件
+*.obj
+*.log
+*.ipch
