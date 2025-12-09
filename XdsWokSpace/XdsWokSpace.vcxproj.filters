@@ -24,7 +24,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="XdsPowerMonitor.cpp">
+    <ClCompile Include="main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Library\fmt\src\format.cc">
@@ -92,6 +92,9 @@
     </ClCompile>
     <ClCompile Include="Library\simpleble\src\backends\common\ServiceBase.cpp">
       <Filter>CommonBase</Filter>
+    </ClCompile>
+    <ClCompile Include="XdsMonitor.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

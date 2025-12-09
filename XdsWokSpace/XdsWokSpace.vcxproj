@@ -154,7 +154,8 @@
     <ClCompile Include="Library\simpleble\src\frontends\safe\AdapterSafe.cpp" />
     <ClCompile Include="Library\simpleble\src\frontends\safe\PeripheralSafe.cpp" />
     <ClCompile Include="Library\simpleble\src\Logging.cpp" />
-    <ClCompile Include="XdsPowerMonitor.cpp" />
+    <ClCompile Include="XdsMonitor.cpp" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
