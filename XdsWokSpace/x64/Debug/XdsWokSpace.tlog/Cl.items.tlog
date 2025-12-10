@@ -20,4 +20,5 @@ C:\Users\Renni\Desktop\111\1111\XdsWokSpace\XdsWokSpace\Library\simpleble\src\fr
 C:\Users\Renni\Desktop\111\1111\XdsWokSpace\XdsWokSpace\Library\simpleble\src\frontends\safe\AdapterSafe.cpp;C:\Users\Renni\Desktop\111\1111\XdsWokSpace\XdsWokSpace\x64\Debug\AdapterSafe.obj
 C:\Users\Renni\Desktop\111\1111\XdsWokSpace\XdsWokSpace\Library\simpleble\src\frontends\safe\PeripheralSafe.cpp;C:\Users\Renni\Desktop\111\1111\XdsWokSpace\XdsWokSpace\x64\Debug\PeripheralSafe.obj
 C:\Users\Renni\Desktop\111\1111\XdsWokSpace\XdsWokSpace\Library\simpleble\src\Logging.cpp;C:\Users\Renni\Desktop\111\1111\XdsWokSpace\XdsWokSpace\x64\Debug\Logging.obj
-C:\Users\Renni\Desktop\111\1111\XdsWokSpace\XdsWokSpace\XdsPowerMonitor.cpp;C:\Users\Renni\Desktop\111\1111\XdsWokSpace\XdsWokSpace\x64\Debug\XdsPowerMonitor.obj
+C:\Users\Renni\Desktop\111\1111\XdsWokSpace\XdsWokSpace\XdsMonitor.cpp;C:\Users\Renni\Desktop\111\1111\XdsWokSpace\XdsWokSpace\x64\Debug\XdsMonitor.obj
+C:\Users\Renni\Desktop\111\1111\XdsWokSpace\XdsWokSpace\main.cpp;C:\Users\Renni\Desktop\111\1111\XdsWokSpace\XdsWokSpace\x64\Debug\main.obj

@@ -90,11 +90,11 @@
     <ClCompile Include="XdsMonitor.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Library\fmt\src\os.cc">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Library\fmt\src\format.cc">
-      <Filter>源文件</Filter>
+      <Filter>fmt</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\fmt\src\os.cc">
+      <Filter>fmt</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
