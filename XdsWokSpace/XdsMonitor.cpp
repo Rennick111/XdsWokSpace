@@ -40,7 +40,7 @@ void XdsMonitor::printHex(const uint8_t* data, int length) {
     std::cout << std::dec << std::setfill(' '); // 恢复十进制
 }
 
-// 核心数据处理函数 (完全重写以复现 App 功能)
+// 核心数据处理函数
 void XdsMonitor::onDataReceived(SimpleBLE::ByteArray bytes) {
     long long now = millis();
     m_lastDataTime = now;
@@ -61,7 +61,7 @@ void XdsMonitor::onDataReceived(SimpleBLE::ByteArray bytes) {
         angle = getSignedValue(data, 6);                  // 角度
     }
 
-    // 获取 Byte 8-9 的值 (真实硬件这是“累计圈数”，模拟器如果是旧版则是“实时踏频”)
+    // 获取 Byte 8-9 的值 (累计圈数)
     uint16_t rawCadenceData = getUnsignedValue(data, 8);
     uint8_t errorCode = data[10];
 
