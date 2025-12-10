@@ -40,92 +40,87 @@
 
 ## 📂 项目结构说明
 
- XdsWokSpace/                            ← 项目根目录
-│                                        
+ XdsWokSpace/                     ← 项目根目录
 │
-├── 📂 Library/                          [第三方依赖库目录]
-│   │                                     项目编译所需的外部依赖统一放置于此，
-│   │                                     （无需额外安装环境）
+├── Library/                    ← 第三方依赖库目录
+│   │                            （项目无需额外安装环境）
 │   │
-│   ├── 📂 include/                      [头文件目录]
-│   │      ├── SimpleBLE/                SimpleBLE 的 C++ 头文件（蓝牙操作 API）
-│   │      ├── fmt/                      fmt 格式化库头文件
-│   │      └── 其他 .h/.hpp              其它第三方库的头文件
+│   ├── include/                ← 头文件目录（.h / .hpp）
+│   │   ├── SimpleBLE/          SimpleBLE 的 C++ 蓝牙 API 头文件
+│   │   ├── fmt/                fmt 格式化库的头文件
+│   │   └── other headers...    其他第三方库的头文件
 │   │
-│   │   （作用）
-│   │   ✔ 提供外部库的函数、类、结构体声明  
-│   │   ✔ main.cpp / ble_manager.cpp 会通过 #include 调用这些接口  
-│   │   ✔ VS 项目会将此目录加入“附加包含目录（Include Directories）”
+│   │   【作用】
+│   │   - 提供外部库的函数、类、结构体声明
+│   │   - main.cpp / ble_manager.cpp 通过 #include 使用
+│   │   - VS 在编译时会将此目录加入 “Include Directories”
 │   │
-│   └── 📂 lib/                          [静态库目录]
-│         ├── SimpleBLE.lib              SimpleBLE 预编译库，负责 BLE 底层实现
-│         ├── fmt.lib                    fmt 的静态库
-│         └── otherlibs.lib              其他可能使用的第三方库
+│   └── lib/                    ← 静态库目录（.lib）
+│       ├── SimpleBLE.lib       SimpleBLE 预编译库（蓝牙底层实现）
+│       ├── fmt.lib             fmt 格式化库
+│       └── otherlibs.lib       其他所需第三方库
 │
-│       （作用）
-│       ✔ 编译链接阶段由 VS 链接器加载  
-│       ✔ 将底层蓝牙、格式化等功能嵌入最终的可执行文件中  
-│       ✔ 避免用户本机必须安装 SimpleBLE  
+│       【作用】
+│       - 编译链接阶段由 VS 链接器加载
+│       - 把蓝牙、格式化等底层能力嵌入最终可执行文件
+│       - 用户无需在本机安装 SimpleBLE 即可运行
 │
-├── 📂 src/                               [核心源代码目录]
-│   │                                     所有业务逻辑与程序核心功能均在此实现
+├── src/                        ← 核心源代码目录
 │   │
-│   ├── 📄 main.cpp                       [程序入口]
-│   │      （主要职责）
-│   │      1. 初始化程序环境（日志、时间、蓝牙模块等）
-│   │      2. 创建 BLE 管理对象（BleManager）并启动扫描
-│   │      3. 发现目标功率计后发起连接
-│   │      4. 设置 Notify 回调 → 当接收到蓝牙数据时调用 data_parser
-│   │      5. 控制程序主循环：事件处理、异常捕获、退出逻辑
-│   │      6. 输出实时功率、踏频等解析结果
+│   ├── main.cpp                ← 程序入口
+│   │   【职责】
+│   │   1. 初始化程序环境（日志/蓝牙模块/时间等）
+│   │   2. 创建 BleManager 并启动扫描
+│   │   3. 找到目标功率计后建立连接
+│   │   4. 设置 Notify 回调 → 接收蓝牙数据并转给 data_parser
+│   │   5. 主循环：事件调度、异常捕获、退出逻辑
+│   │   6. 输出解析后的实时功率、踏频等数据
 │   │
-│   ├── 📄 ble_manager.cpp                [蓝牙管理模块]
-│   │      （主要职责）
-│   │      1. 封装 SimpleBLE API（Adapter、Peripheral、Characteristic）
-│   │      2. 执行设备扫描 → 并按条件过滤（名称/UUID/MAC 等）
-│   │      3. 建立连接并发现特征值（Characteristic）
-│   │      4. 订阅 Notify → 接收功率计实时广播数据
-│   │      5. 处理断线、重连、蓝牙异常等情况
+│   ├── ble_manager.cpp         ← 蓝牙管理模块
+│   │   【职责】
+│   │   1. 封装 SimpleBLE API（Adapter / Peripheral / Characteristic）
+│   │   2. 执行蓝牙扫描 → 并按条件过滤（设备名/UUID/MAC）
+│   │   3. 建立连接、发现特征值（Characteristic）
+│   │   4. 订阅 Notify → 接收功率计实时广播数据
+│   │   5. 处理断线/重连/蓝牙异常
 │   │
-│   ├── 📄 data_parser.cpp                [数据解析模块]
-│   │      （主要职责）
-│   │      1. 接收来自 BLE 的原始字节流 RawData（uint8_t[]）
-│   │      2. 按照功率计协议解析字段：
-│   │          • 功率值（Instant Power）
-│   │          • 踏频（Cadence）
-│   │          • 扭矩（Torque）
-│   │          • 时间戳/计数器等数据
-│   │      3. 校验数据长度、CRC/校验和、异常值过滤
-│   │      4. 输出结构化数据（PowerData 结构体）
+│   ├── data_parser.cpp         ← 数据解析模块
+│   │   【职责】
+│   │   1. 解析来自 BLE 的原始字节流 RawData (uint8_t[])
+│   │   2. 按协议解析以下字段：
+│   │       - Instant Power（瞬时功率）
+│   │       - Cadence（踏频）
+│   │       - Torque（扭矩）
+│   │       - 时间戳/计数器等
+│   │   3. 进行数据长度校验、CRC/校验和、异常处理
+│   │   4. 输出结构化数据（PowerData 结构体）
 │   │
-│   └── 📄 utils.cpp                      [通用工具模块]
-│          （主要职责）
-│          ✔ 字节数组转十六进制字符串（调试用）  
-│          ✔ 小端字节序转 int16/int32  
-│          ✔ 时间戳获取与间隔计算（用于判断超时/掉线）  
-│          ✔ 日志辅助输出/格式化  
-│          ✔ 常用数学或格式化工具  
+│   └── utils.cpp               ← 通用工具模块
+│       【职责】
+│       - 字节数组 → 十六进制字符串（调试用）
+│       - 小端字节序 → int16/int32 转换
+│       - 获取时间戳、计算时间间隔（判断超时/掉线）
+│       - 日志格式化输出
+│       - 其他常用数学/字符串工具
 │
-├── 📄 XdsWokSpace.vcxproj                [VS 项目配置文件]
-│       （作用）
-│       • 定义 C++ 编译器设置（标准、预处理宏等）  
-│       • 指定 src/ 与 Library/include 的路径  
-│       • 指定 Library/lib 的链接路径  
-│       • 指定要链接的 .lib 文件（如 SimpleBLE.lib）  
-│       • 定义 Debug/Release、x64/x86 编译配置  
+├── XdsWokSpace.vcxproj         ← VS 项目配置文件
+│   【作用】
+│   - 设置 C++ 编译器参数（标准、预处理宏等）
+│   - 指定 src/ 与 Library/include 路径
+│   - 指定 Library/lib 为链接库路径
+│   - 告诉链接器需要链接 SimpleBLE.lib / fmt.lib 等
+│   - 定义 Debug / Release、x64 / x86 等构建配置
 │
-├── 📄 XdsWokSpace.sln                    [VS 解决方案文件]
-│       （作用）
-│       • Visual Studio 的项目入口  
-│       • 包含项目组织结构、调试配置、依赖关系等  
-│       • 双击即可在 VS 打开整个工程  
+├── XdsWokSpace.sln             ← VS 解决方案文件
+│   【作用】
+│   - VS 工程入口，双击即可打开项目
+│   - 定义项目组织结构、调试配置、依赖关系等
 │
-└── 📄 README.md                          [项目说明文档]
-        ✔ 项目简介（BLE 功率计解析工具）  
-        ✔ 编译运行步骤   
-        ✔ 如何扫描、连接设备  
-        ✔ 常见问题（驱动问题、蓝牙权限、设备未发现）  
-
+└── README.md                   ← 项目说明文档
+    - 项目介绍（BLE 功率计解析工具）
+    - 编译运行步骤
+    - 蓝牙扫描/连接指南
+    - 常见故障（驱动/蓝牙权限/设备找不到）
 
 ------------------------------------------------------------------------
 
@@ -237,5 +232,102 @@
 
 -   程序内置防抖，需要连续踩踏\
 -   停止踩踏超过 2.5s 踏频自动归零
+===============================================================================================
+### 项目运作流程图
 
+```mermaid
+flowchart TD
+    %% --- 定义节点样式 ---
+    classDef process fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+    classDef decision fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
+    classDef terminator fill:#ffcdd2,stroke:#c62828,stroke-width:2px;
+    classDef storage fill:#f0f4c3,stroke:#827717,stroke-width:2px;
+    classDef async fill:#e1bee7,stroke:#4a148c,stroke-width:2px,stroke-dasharray: 5 5;
+
+    %% --- 主程序入口 ---
+    Start((程序启动<br>main)):::terminator --> SetSignal[设置信号处理<br>SIGINT]:::process
+    SetSignal --> InitMonitor[实例化 XdsMonitor]:::process
+    InitMonitor --> RunMonitor[调用 monitor.run]:::process
+
+    %% --- XdsMonitor::run() 主逻辑 ---
+    subgraph MainLoop [🔁 主运行循环 / XdsMonitor::run]
+        direction TB
+        
+        RunMonitor --> InitAdapter{初始化适配器<br>initAdapter}:::decision
+        InitAdapter -- 失败 --> EndProgram((退出程序)):::terminator
+        InitAdapter -- 成功 --> ScanStep[调用 scanAndSelectDevice]:::process
+
+        %% 扫描与选择逻辑
+        ScanStep --> BLEScan[执行 BLE 扫描 5秒]:::process
+        BLEScan --> ShowList[打印设备列表]:::process
+        ShowList --> CheckAuto{是否自动重连?}:::decision
+        
+        CheckAuto -- 是 --> SetTarget[锁定上次设备]:::process
+        CheckAuto -- 否 --> UserInput[/用户输入 ID/r/q/]:::storage
+        
+        UserInput -- "q (退出)" --> EndProgram
+        UserInput -- "r (重试)" --> BLEScan
+        UserInput -- "ID (选中)" --> SetTarget
+
+        %% 连接逻辑
+        SetTarget --> ConnectStep[调用 connectDevice]:::process
+        ConnectStep --> DoConn{连接成功?}:::decision
+        
+        DoConn -- 否 --> WaitRetry[等待 3秒]:::process
+        WaitRetry --> BLEScan
+        
+        DoConn -- 是 --> FindSvc{发现服务/特征值?<br>1828 / 2a63}:::decision
+        FindSvc -- 否 --> Disconnect[断开连接]:::process
+        Disconnect --> WaitRetry
+        
+        %% 监控逻辑
+        FindSvc -- 是 --> StartMon[调用 startMonitoring]:::process
+    end
+
+    %% --- 监控与数据流 ---
+    subgraph MonitorLogic [⚡ 监控阶段 / startMonitoring]
+        direction TB
+        StartMon --> Subscribe[订阅 Notify 回调]:::process
+        Subscribe --> InitStats[重置统计数据<br>startTime, maxPower...]:::process
+        
+        %% 保持连接的循环
+        InitStats --> CheckConn{检查连接状态<br>& 超时}:::decision
+        CheckConn -- "连接断开/用户停止" --> Unsub[取消订阅 & 断开]:::process
+        Unsub --> WaitReconnect[准备重连]:::process
+        WaitReconnect --> BLEScan
+        
+        CheckConn -- "正常运行" --> Sleep[Sleep 100ms]:::process
+        Sleep --> CheckConn
+    end
+
+    %% --- 异步数据处理回调 ---
+    subgraph DataPipeline [⚙️ 数据处理流水线 / onDataReceived]
+        direction TB
+        
+        %% 触发源
+        BLEEvent(BLE Notify 事件):::async -.-> |ByteArray| ParseRaw[解析原始数据]:::process
+        
+        %% 1. 基础解析
+        ParseRaw --> GetVal1[解析 Power/L/R/Angle<br>getUnsigned/SignedValue]:::process
+        
+        %% 2. 踏频算法
+        GetVal1 --> CalcCadence{是第一个包?}:::decision
+        CalcCadence -- 是 --> InitCadence[记录初始圈数]:::process
+        CalcCadence -- 否 --> DiffCalc[计算圈数差 & 时间差]:::process
+        DiffCalc --> ValidDiff{差值有效?}:::decision
+        ValidDiff -- "是 (>0)" --> ComputeRPM[计算瞬时 RPM]:::process
+        ValidDiff -- "否 (超时>2.5s)" --> ZeroRPM[RPM 置 0]:::process
+        
+        %% 3. 统计更新
+        ComputeRPM --> UpdateStatsCalc[更新统计数据<br>Avg/Max Power, Balance]:::process
+        ZeroRPM --> UpdateStatsCalc
+        InitCadence --> UpdateStatsCalc
+        
+        %% 4. UI 输出
+        UpdateStatsCalc --> PrintUI[/格式化打印 Console<br>清除当前行并刷新/]:::storage
+    end
+
+    %% 关联关系
+    Subscribe -.-> |注册回调| BLEEvent
+```
 
