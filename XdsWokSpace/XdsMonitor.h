@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <string>
 #include <vector>
@@ -11,47 +11,65 @@ class XdsMonitor {
 public:
     XdsMonitor();
 
-    // Ö÷ÔËĞĞº¯Êı
+    // ä¸»è¿è¡Œå‡½æ•°
     void run();
 
-    // ¾²Ì¬·½·¨ÓÃÓÚÍ£Ö¹ÔËĞĞ (¹©ĞÅºÅ´¦Àíµ÷ÓÃ)
+    // é™æ€æ–¹æ³•ç”¨äºåœæ­¢è¿è¡Œ (ä¾›ä¿¡å·å¤„ç†è°ƒç”¨)
     static void stop();
 
 private:
-    // ÄÚ²¿Âß¼­²½Öè
+    // å†…éƒ¨é€»è¾‘æ­¥éª¤
     bool initAdapter();
-    bool scanAndSelectDevice(); // ·µ»Ø true ±íÊ¾Ñ¡µ½ÁËÉè±¸
+    bool scanAndSelectDevice(); // è¿”å› true è¡¨ç¤ºé€‰åˆ°äº†è®¾å¤‡
     bool connectDevice();
     void startMonitoring();
 
-    // ¸¨Öú¹¤¾ß
+    // è¾…åŠ©å·¥å…·
     long long millis();
     uint16_t getUnsignedValue(const uint8_t* data, int offset);
     int16_t getSignedValue(const uint8_t* data, int offset);
-    void printHex(const uint8_t* data, int length); // ĞÂÔö£º´òÓ¡Ô­Ê¼Êı¾İ
+    void printHex(const uint8_t* data, int length);
 
-    // Êı¾İ»Øµ÷
+    // æ•°æ®å›è°ƒ
     void onDataReceived(SimpleBLE::ByteArray bytes);
 
 private:
-    // ³ÉÔ±±äÁ¿
+    // æˆå‘˜å˜é‡
     SimpleBLE::Adapter m_adapter;
     SimpleBLE::Peripheral m_targetDevice;
 
-    // ×´Ì¬¿ØÖÆ
+    // çŠ¶æ€æ§åˆ¶
     static std::atomic<bool> s_running;
     std::atomic<long long> m_lastDataTime{ 0 };
     std::mutex m_printMutex;
 
-    // Ñ¡ÖĞµÄÉè±¸µØÖ·£¬ÓÃÓÚÖØÁ¬
+    // é€‰ä¸­çš„è®¾å¤‡åœ°å€ï¼Œç”¨äºé‡è¿
     std::string m_targetAddress;
     bool m_autoReconnect = false;
 
-    // ÅäÖÃ³£Á¿
+    // é…ç½®å¸¸é‡
     const std::string TARGET_UUID_SUBSTRING = "1828";
     const std::string CHAR_UUID_SUBSTRING = "2a63";
 
-    // ÔËĞĞÊ±·¢ÏÖµÄ UUID
+    // è¿è¡Œæ—¶å‘ç°çš„ UUID
     std::string m_foundServiceUUID;
     std::string m_foundCharUUID;
+
+    // --- æ–°å¢ï¼šç»Ÿè®¡ä¸è®¡ç®—å˜é‡ ---
+
+    // 1. æ—¶é—´ç»Ÿè®¡
+    long long m_startTime = 0;           // å¼€å§‹ç›‘æ§çš„æ—¶é—´æˆ³ (ms)
+
+    // 2. åŠŸç‡ç»Ÿè®¡
+    uint16_t m_maxPower = 0;             // æœ€å¤§åŠŸç‡ (W)
+    unsigned long long m_sumPower = 0;   // åŠŸç‡ç´¯åŠ å’Œ (ç”¨äºç®—å¹³å‡)
+    uint32_t m_powerSampleCount = 0;     // åŠŸç‡æ ·æœ¬è®¡æ•°
+
+    // 3. è¸é¢‘ç»Ÿè®¡ (åŒ…å«ç´¯è®¡å€¼è½¬RPMç®—æ³•)
+    uint16_t m_lastCrankCount = 0;       // ä¸Šä¸€æ¬¡çš„ç´¯è®¡åœˆæ•°
+    long long m_lastCrankTime = 0;       // ä¸Šä¸€æ¬¡æ”¶åˆ°åœˆæ•°çš„æ—¶é—´
+    bool m_firstPacket = true;           // æ˜¯å¦æ˜¯ç¬¬ä¸€ä¸ªåŒ…
+
+    unsigned long long m_sumCadence = 0; // è¸é¢‘ç´¯åŠ å’Œ (RPM)
+    uint32_t m_cadenceSampleCount = 0;   // è¸é¢‘æ ·æœ¬è®¡æ•°
 };

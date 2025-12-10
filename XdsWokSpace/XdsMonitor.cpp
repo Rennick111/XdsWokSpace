@@ -4,6 +4,7 @@
 #include <chrono>
 #include <algorithm>
 #include <vector>
+#include <cmath> // 用于 abs
 
 // 初始化静态成员
 std::atomic<bool> XdsMonitor::s_running{ true };
@@ -39,45 +40,144 @@ void XdsMonitor::printHex(const uint8_t* data, int length) {
     std::cout << std::dec << std::setfill(' '); // 恢复十进制
 }
 
+// 核心数据处理函数 (完全重写以复现 App 功能)
 void XdsMonitor::onDataReceived(SimpleBLE::ByteArray bytes) {
-    m_lastDataTime = millis();
+    long long now = millis();
+    m_lastDataTime = now;
+
     const uint8_t* data = (const uint8_t*)bytes.c_str();
     int len = bytes.length();
 
     if (len < 11) return;
 
-    // 解析逻辑 - 与 Arduino 固件完全对齐
-    uint16_t totalPower = getUnsignedValue(data, 0);
-    int16_t leftPower = getSignedValue(data, 2);
-    int16_t rightPower = getSignedValue(data, 4);
+    // ---------------------------------------------------------
+    // 1. 基础数据解析 (Raw Parsing)
+    // ---------------------------------------------------------
+    uint16_t instPower = getUnsignedValue(data, 0);       // 实时功率
+    int16_t leftPower = getSignedValue(data, 2);         // 左腿功率
+    int16_t rightPower = getSignedValue(data, 4);         // 右腿功率
     int16_t angle = 0;
     if (len >= 8) {
-        angle = getSignedValue(data, 6); // 新增：角度解析 (Byte 6-7)
+        angle = getSignedValue(data, 6);                  // 角度
     }
-    uint16_t cadence = getUnsignedValue(data, 8);
+
+    // 获取 Byte 8-9 的值 (真实硬件这是“累计圈数”，模拟器如果是旧版则是“实时踏频”)
+    uint16_t rawCadenceData = getUnsignedValue(data, 8);
     uint8_t errorCode = data[10];
 
-    // 简单过滤
-    if (totalPower > 2500) return;
+    // 简单过滤异常值
+    if (instPower > 2500) return;
 
+    // ---------------------------------------------------------
+    // 2. 踏频计算 (累计圈数 -> 实时 RPM)
+    // ---------------------------------------------------------
+    uint16_t instCadence = 0; // 最终计算出的实时 RPM
+
+    if (m_firstPacket) {
+        m_lastCrankCount = rawCadenceData;
+        m_lastCrankTime = now;
+        m_firstPacket = false;
+        instCadence = 0;
+    }
+    else {
+        // 计算圈数增量 (处理 uint16 65535->0 的溢出)
+        uint16_t diffCount = 0;
+        if (rawCadenceData >= m_lastCrankCount) {
+            diffCount = rawCadenceData - m_lastCrankCount;
+        }
+        else {
+            diffCount = (65535 - m_lastCrankCount) + rawCadenceData + 1;
+        }
+
+        long long diffTime = now - m_lastCrankTime;
+
+        // 只有当圈数发生变化，或者时间过去太久(停止踩踏)，才更新 RPM
+        if (diffCount > 0 && diffTime > 0) {
+            // RPM = (圈数 * 60000ms) / 时间ms
+            instCadence = (uint16_t)((diffCount * 60000) / diffTime);
+
+            // 限制一下最大值，防止数据抖动出现 300+ rpm
+            if (instCadence > 200) instCadence = 200;
+
+            // 更新状态
+            m_lastCrankCount = rawCadenceData;
+            m_lastCrankTime = now;
+        }
+        else {
+            // 如果圈数没变，且距离上次更新超过 2.5秒 (相当于 < 24 RPM)，认为停止
+            if (now - m_lastCrankTime > 2500) {
+                instCadence = 0;
+            }
+            else {
+                // 暂时保持 0 或上一次的值？通常 App 会归零
+                instCadence = 0;
+            }
+        }
+    }
+
+    // ---------------------------------------------------------
+    // 3. App 衍生数据计算 (Statistics)
+    // ---------------------------------------------------------
+
+    // A. 骑行时间 (MM:SS)
+    long long elapsedMs = now - m_startTime;
+    int totalSeconds = elapsedMs / 1000;
+    int minutes = totalSeconds / 60;
+    int seconds = totalSeconds % 60;
+
+    // B. 最大功率 (Max Power)
+    if (instPower > m_maxPower) {
+        m_maxPower = instPower;
+    }
+
+    // C. 平均功率 (Avg Power) - 包含 0 值以反映真实强度
+    m_sumPower += instPower;
+    m_powerSampleCount++;
+    int avgPower = (m_powerSampleCount > 0) ? (m_sumPower / m_powerSampleCount) : 0;
+
+    // D. 平均踏频 (Avg Cadence) - 通常只统计踩踏期间 (Non-zero averaging)
+    if (instCadence > 0) {
+        m_sumCadence += instCadence;
+        m_cadenceSampleCount++;
+    }
+    int avgCadence = (m_cadenceSampleCount > 0) ? (m_sumCadence / m_cadenceSampleCount) : 0;
+
+    // E. 左右平衡率 (L/R Balance)
+    // 公式: 左 / (左 + 右) * 100%
+    int leftBalance = 50;
+    int rightBalance = 50;
+    int totalLR = std::abs(leftPower) + std::abs(rightPower); // 使用绝对值防止负数干扰
+
+    if (totalLR > 0) {
+        leftBalance = (std::abs(leftPower) * 100) / totalLR;
+        rightBalance = 100 - leftBalance;
+    }
+
+    // ---------------------------------------------------------
+    // 4. 格式化输出 (UI Display)
+    // ---------------------------------------------------------
     std::lock_guard<std::mutex> lock(m_printMutex);
 
-    // 使用 ANSI 控制码清空当前行并覆盖
-    // 注意：增加换行以便观察数据流，或者使用回车覆盖
-    // 这里我改为每行输出，因为包含了 Hex 数据，单行刷新可能显示不全
-    // 如果你喜欢单行刷新，可以保留 \r
+    // 使用 ANSI 控制码清除当前行
+    std::cout << "\r\033[K";
 
-    std::cout << "\r\033[K"; // 清除行
+    // 打印格式：[时间] 功率(实/均/最) | 踏频(实/均) | 平衡(L/R) | 角度
+    std::cout << "[" << std::setw(2) << std::setfill('0') << minutes << ":"
+        << std::setw(2) << std::setfill('0') << seconds << "] "
+        << std::setfill(' ') // 恢复填充为空格
 
-    // 格式化输出
-    std::cout << "PWR:" << std::left << std::setw(4) << totalPower
-        << " CAD:" << std::setw(3) << cadence
-        << " L/R:" << std::setw(4) << leftPower << "/" << std::setw(4) << rightPower
-        << " Ang:" << std::setw(4) << angle
-        << " Err:" << (int)errorCode << " ";
+        << "PWR:" << std::setw(3) << instPower << "/"
+        << std::setw(3) << avgPower << "/"
+        << std::setw(3) << m_maxPower << "W "
 
-    // 简略显示 HEX (最后几个字节)
-    // printHex(data, len); 
+        << "CAD:" << std::setw(3) << instCadence << "/"
+        << std::setw(3) << avgCadence << " "
+
+        << "L/R:" << std::setw(2) << leftBalance << "/"
+        << std::setw(2) << rightBalance << "% "
+
+        << "Ang:" << std::setw(3) << angle << " "
+        << "E:" << (int)errorCode;
 
     std::cout << std::flush;
 }
@@ -94,9 +194,6 @@ bool XdsMonitor::initAdapter() {
 }
 
 bool XdsMonitor::scanAndSelectDevice() {
-    // 如果已经有目标地址且开启自动重连，尝试直接跳过扫描（SimpleBLE 暂不支持直接按地址连接未扫描设备，所以仍需扫描）
-    // 但我们可以自动匹配
-
     bool isTargetSelected = false;
     m_autoReconnect = false;
 
@@ -110,7 +207,7 @@ bool XdsMonitor::scanAndSelectDevice() {
             continue;
         }
 
-        // 如果我们之前连接过，尝试自动重连
+        // 自动重连逻辑
         if (!m_targetAddress.empty()) {
             for (auto& p : peripherals) {
                 if (p.address() == m_targetAddress) {
@@ -169,9 +266,9 @@ bool XdsMonitor::scanAndSelectDevice() {
 
             if (selectedId >= 0 && selectedId < peripherals.size()) {
                 m_targetDevice = peripherals[selectedId];
-                m_targetAddress = m_targetDevice.address(); // 记住地址以便重连
+                m_targetAddress = m_targetDevice.address();
                 isTargetSelected = true;
-                m_autoReconnect = true; // 开启后续自动重连
+                m_autoReconnect = true;
             }
         }
         catch (...) { std::cout << "输入无效" << std::endl; }
@@ -192,7 +289,6 @@ bool XdsMonitor::connectDevice() {
     std::cout << "[系统] 正在寻找 XDS 服务..." << std::endl;
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-    // 重置 UUID
     m_foundServiceUUID = "";
     m_foundCharUUID = "";
 
@@ -216,7 +312,7 @@ bool XdsMonitor::connectDevice() {
     }
 
     if (m_foundServiceUUID.empty() || m_foundCharUUID.empty()) {
-        std::cerr << "[错误] 未找到服务或特征值！可能不是兼容的 XDS 设备。" << std::endl;
+        std::cerr << "[错误] 未找到服务或特征值！" << std::endl;
         m_targetDevice.disconnect();
         return false;
     }
@@ -225,13 +321,29 @@ bool XdsMonitor::connectDevice() {
 
 void XdsMonitor::startMonitoring() {
     std::cout << "\n[3/3] 开始监控数据 (按 Ctrl+C 退出)..." << std::endl;
-    std::cout << "格式说明: PWR(总功率) CAD(踏频) L/R(左右腿数据) Ang(角度) Err(错误码)" << std::endl;
+    std::cout << "==========================================================================" << std::endl;
+    std::cout << "显示格式: [时间] PWR:实时/平均/最大 | CAD:实时/平均 | L/R:平衡% | Ang:角度" << std::endl;
+    std::cout << "==========================================================================" << std::endl;
 
     try {
         m_targetDevice.notify(m_foundServiceUUID, m_foundCharUUID, [this](SimpleBLE::ByteArray bytes) {
             this->onDataReceived(bytes);
             });
+
+        // --- 初始化统计数据 ---
         m_lastDataTime = millis();
+        m_startTime = millis(); // 记录开始时间
+
+        m_maxPower = 0;
+        m_sumPower = 0;
+        m_powerSampleCount = 0;
+
+        m_sumCadence = 0;
+        m_cadenceSampleCount = 0;
+
+        m_lastCrankCount = 0;
+        m_firstPacket = true;
+        // --------------------
     }
     catch (std::exception& e) {
         std::cerr << "[错误] 订阅失败: " << e.what() << std::endl;
@@ -241,21 +353,18 @@ void XdsMonitor::startMonitoring() {
     while (s_running) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        // 检查连接状态
         if (!m_targetDevice.is_connected()) {
             std::cout << "\n[警告] 设备连接断开！" << std::endl;
-            break; // 跳出循环，触发外部重连逻辑
+            break;
         }
 
-        // 检查数据超时
         if (millis() - m_lastDataTime > 5000) {
             std::lock_guard<std::mutex> lock(m_printMutex);
             std::cout << "\r\033[K" << "[状态] 等待数据中..." << std::flush;
-            m_lastDataTime = millis(); // 重置以免疯狂打印
+            m_lastDataTime = millis();
         }
     }
 
-    // 清理工作
     if (m_targetDevice.is_connected()) {
         try {
             m_targetDevice.unsubscribe(m_foundServiceUUID, m_foundCharUUID);
@@ -268,15 +377,11 @@ void XdsMonitor::startMonitoring() {
 void XdsMonitor::run() {
     if (!initAdapter()) return;
 
-    // 外层循环：负责整体流程（扫描 -> 连接 -> 监控 -> 断开 -> 重试）
     while (s_running) {
-        // 1. 扫描并选择 (如果是断线重连，scanAndSelectDevice 内部会尝试匹配上次的 MAC)
         if (!scanAndSelectDevice()) break;
 
-        // 2. 连接
         if (!s_running) break;
         if (connectDevice()) {
-            // 3. 监控 (阻塞直到断开或手动退出)
             startMonitoring();
         }
         else {
@@ -284,7 +389,6 @@ void XdsMonitor::run() {
             std::this_thread::sleep_for(std::chrono::seconds(3));
         }
 
-        // 如果用户按了 Ctrl+C，就不再重试
         if (!s_running) break;
 
         std::cout << "\n[系统] 准备重新建立连接..." << std::endl;

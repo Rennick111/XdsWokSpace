@@ -27,12 +27,6 @@
     <ClCompile Include="main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Library\fmt\src\format.cc">
-      <Filter>fmt</Filter>
-    </ClCompile>
-    <ClCompile Include="Library\fmt\src\os.cc">
-      <Filter>fmt</Filter>
-    </ClCompile>
     <ClCompile Include="Library\simpleble\src\Exceptions.cpp">
       <Filter>SimpleBLE</Filter>
     </ClCompile>
@@ -94,6 +88,12 @@
       <Filter>CommonBase</Filter>
     </ClCompile>
     <ClCompile Include="XdsMonitor.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\fmt\src\os.cc">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Library\fmt\src\format.cc">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
