@@ -434,7 +434,8 @@ void XdsMonitor::refreshDisplay() {
     int avgPower = (m_powerSampleCount > 0) ? (m_sumPower / m_powerSampleCount) : 0;
     int avgCad = (m_cadenceSampleCount > 0) ? (m_sumCadence / m_cadenceSampleCount) : 0;
 
-    std::cout << "[" << std::setw(2) << std::setfill('0') << mins << ":"
+    std::cout << "["
+        << std::right << std::setw(2) << std::setfill('0') << mins << ":"
         << std::setw(2) << std::setfill('0') << secs << "] "
         << std::setfill(' ');
 
