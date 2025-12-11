@@ -453,7 +453,7 @@ void XdsMonitor::refreshDisplay() {
 
     case DeviceType::HEART_RATE:
         std::cout << "❤️ HR: " << std::setw(3) << m_displayHeartRate << " bpm "
-            << "(MAX: " << "-" << ")"; // 简单起见不统计最大心率
+            << " " << "" << ""; // 不统计最大心率
         break;
 
     case DeviceType::CSC_SENSOR:

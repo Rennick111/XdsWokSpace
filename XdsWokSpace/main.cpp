@@ -14,7 +14,7 @@ int main() {
     system("chcp 65001 > nul");
 #endif
 
-    std::cout << "=== XDS 功率计 PC 监视工具 (v3.0 - Refactored) ===" << std::endl;
+    std::cout << "=== XDS 功率计 PC 监视工具 ===" << std::endl;
     std::cout << "提示: 请确保功率计已唤醒(轻拍三下功率计)，且手机APP已完全关闭！" << std::endl;
 
     // 2. 创建并运行监控器
