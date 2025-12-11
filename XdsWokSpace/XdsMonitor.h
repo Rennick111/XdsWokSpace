@@ -7,6 +7,15 @@
 #include <iostream>
 #include <simpleble/SimpleBLE.h>
 
+// 定义设备类型枚举
+enum class DeviceType {
+    UNKNOWN,
+    XDS_POWER,      // 原有的 XDS 功率计
+    STD_POWER,      // 标准蓝牙功率计 (CPS)
+    HEART_RATE,     // 蓝牙心率带 (HRS)
+    CSC_SENSOR      // 速度/踏频传感器 (CSCP)
+};
+
 class XdsMonitor {
 public:
     XdsMonitor();
@@ -14,62 +23,71 @@ public:
     // 主运行函数
     void run();
 
-    // 静态方法用于停止运行 (供信号处理调用)
+    // 静态方法用于停止运行
     static void stop();
 
 private:
-    // 内部逻辑步骤
+    // --- 内部流程 ---
     bool initAdapter();
-    bool scanAndSelectDevice(); // 返回 true 表示选到了设备
+    bool scanAndSelectDevice();
     bool connectDevice();
     void startMonitoring();
 
-    // 辅助工具
+    // --- 辅助工具 ---
     long long millis();
     uint16_t getUnsignedValue(const uint8_t* data, int offset);
     int16_t getSignedValue(const uint8_t* data, int offset);
-    void printHex(const uint8_t* data, int length);
 
-    // 数据回调
+    // --- 数据解析路由 ---
     void onDataReceived(SimpleBLE::ByteArray bytes);
 
+    // --- 各类设备的具体解析逻辑 ---
+    void parseXdsData(const uint8_t* data, int len);       // 原 XDS 解析
+    void parseStdPowerData(const uint8_t* data, int len);  // 标准功率计解析 (UUID 2A63)
+    void parseHeartRateData(const uint8_t* data, int len); // 心率解析 (UUID 2A37)
+    void parseCscData(const uint8_t* data, int len);       // 踏频解析 (UUID 2A5B)
+
+    // --- UI 显示 ---
+    void refreshDisplay();
+
 private:
-    // 成员变量
     SimpleBLE::Adapter m_adapter;
     SimpleBLE::Peripheral m_targetDevice;
 
-    // 状态控制
     static std::atomic<bool> s_running;
     std::atomic<long long> m_lastDataTime{ 0 };
     std::mutex m_printMutex;
 
-    // 选中的设备地址，用于重连
     std::string m_targetAddress;
     bool m_autoReconnect = false;
 
-    // 配置常量
-    const std::string TARGET_UUID_SUBSTRING = "1828";
-    const std::string CHAR_UUID_SUBSTRING = "2a63";
+    // --- 当前连接的设备类型 ---
+    DeviceType m_currentType = DeviceType::UNKNOWN;
 
-    // 运行时发现的 UUID
-    std::string m_foundServiceUUID;
-    std::string m_foundCharUUID;
+    // --- 发现的服务与特征 UUID ---
+    std::string m_targetServiceUUID;
+    std::string m_targetCharUUID;
 
-    // --- 新增：统计与计算变量 ---
+    // --- 统计与显示数据 (通用存储) ---
+    long long m_startTime = 0;
 
-    // 1. 时间统计
-    long long m_startTime = 0;           // 开始监控的时间戳 (ms)
+    // 实时数据缓存
+    int m_displayPower = 0;
+    int m_displayCadence = 0;
+    int m_displayHeartRate = 0;
+    int m_displayLBalance = 0;
+    int m_displayRBalance = 0;
+    int m_displayAngle = 0;
 
-    // 2. 功率统计
-    uint16_t m_maxPower = 0;             // 最大功率 (W)
-    unsigned long long m_sumPower = 0;   // 功率累加和 (用于算平均)
-    uint32_t m_powerSampleCount = 0;     // 功率样本计数
+    // 统计用
+    uint16_t m_maxPower = 0;
+    unsigned long long m_sumPower = 0;
+    uint32_t m_powerSampleCount = 0;
+    unsigned long long m_sumCadence = 0;
+    uint32_t m_cadenceSampleCount = 0;
 
-    // 3. 踏频统计 (包含累计值转RPM算法)
-    uint16_t m_lastCrankCount = 0;       // 上一次的累计圈数
-    long long m_lastCrankTime = 0;       // 上一次收到圈数的时间
-    bool m_firstPacket = true;           // 是否是第一个包
-
-    unsigned long long m_sumCadence = 0; // 踏频累加和 (RPM)
-    uint32_t m_cadenceSampleCount = 0;   // 踏频样本计数
+    // 踏频计算辅助 (用于标准 CSCP 和 XDS)
+    uint16_t m_lastCrankCount = 0;
+    long long m_lastCrankTime = 0;
+    bool m_firstPacket = true;
 };
