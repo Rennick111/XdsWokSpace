@@ -11,7 +11,7 @@ const std::string UUID_SVC_CPS = "1818"; // Cycling Power Service (标准功率)
 const std::string UUID_SVC_HRS = "180d"; // Heart Rate Service (心率)
 const std::string UUID_SVC_CSCP = "1816"; // Cycling Speed and Cadence (踏频)
 
-const std::string UUID_CHR_XDS_DATA = "2a63"; // XDS 数据 (复用了 CPS UUID 但格式不同)
+const std::string UUID_CHR_XDS_DATA = "2a63"; // XDS 数据
 const std::string UUID_CHR_CPS_MEAS = "2a63"; // Standard Power Measurement
 const std::string UUID_CHR_HRS_MEAS = "2a37"; // Heart Rate Measurement
 const std::string UUID_CHR_CSC_MEAS = "2a5b"; // CSC Measurement
@@ -95,7 +95,7 @@ bool XdsMonitor::scanAndSelectDevice() {
                     detectedType = DeviceType::HEART_RATE; typeStr = "心率带"; break;
                 }
                 if (uuid.find(UUID_SVC_CSCP) != std::string::npos) {
-                    detectedType = DeviceType::CSC_SENSOR; typeStr = "踏频/速度"; break;
+                    detectedType = DeviceType::CSC_SENSOR; typeStr = "踏频传感器"; break;
                 }
             }
 
@@ -127,7 +127,7 @@ bool XdsMonitor::scanAndSelectDevice() {
 
         try {
             int sel = std::stoi(input);
-            if (sel >= 0 && sel < peripherals.size()) {
+            if (sel >= 0 && sel < (int)peripherals.size()) {
                 m_targetDevice = peripherals[sel];
                 m_targetAddress = m_targetDevice.address();
 
@@ -193,7 +193,7 @@ bool XdsMonitor::connectDevice() {
         break;
     case DeviceType::CSC_SENSOR:
         m_targetServiceUUID = UUID_SVC_CSCP; m_targetCharUUID = UUID_CHR_CSC_MEAS;
-        std::cout << ">> 识别模式: 踏频/速度传感器 (CSCP)" << std::endl;
+        std::cout << ">> 识别模式: 踏频传感器 (CSCP)" << std::endl;
         break;
     default:
         std::cerr << "[错误] 无法识别该设备类型或不支持的协议！" << std::endl;
@@ -232,8 +232,10 @@ bool XdsMonitor::connectDevice() {
 void XdsMonitor::onDataReceived(SimpleBLE::ByteArray bytes) {
     long long now = millis();
     m_lastDataTime = now;
-    const uint8_t* data = (const uint8_t*)bytes.c_str();
-    int len = bytes.length();
+
+    // 使用 data() 获取指针
+    const uint8_t* data = (const uint8_t*)bytes.data();
+    int len = (int)bytes.length();
 
     // 路由到具体的解析器
     switch (m_currentType) {
@@ -247,79 +249,95 @@ void XdsMonitor::onDataReceived(SimpleBLE::ByteArray bytes) {
 }
 
 // ---------------------------------------------------------
-// 1. XDS 原始解析逻辑 (保持不变)
+// 1. XDS 协议解析 (V2.1 算法)
 // ---------------------------------------------------------
 void XdsMonitor::parseXdsData(const uint8_t* data, int len) {
     if (len < 10) return;
 
-    // 解析基础值
+    // --- A. 解析基础数据 ---
     uint16_t instPower = getUnsignedValue(data, 0);
     int16_t leftPower = getSignedValue(data, 2);
     int16_t rightPower = getSignedValue(data, 4);
-    int16_t angle = (len >= 8) ? getSignedValue(data, 6) : 0;
-    uint16_t rawCadence = getUnsignedValue(data, 8);
+    int16_t angle = getSignedValue(data, 6);
+    uint16_t current_revs = getUnsignedValue(data, 8); // 累计转数
 
-    if (instPower > 3000) instPower = 0; // 简单过滤
+    if (instPower > 3000) instPower = 0;
 
-    // 踏频算法
-    uint16_t instCadence = 0;
-    long long now = millis();
-    if (m_firstPacket) {
-        m_lastCrankCount = rawCadence;
-        m_lastCrankTime = now;
-        m_firstPacket = false;
+    // --- B. 踏频计算算法 ---
+    auto now = std::chrono::steady_clock::now();
+    double currentRpm = 0.0;
+
+    if (m_first_calc) {
+        m_prev_revs = current_revs;
+        m_prev_time = now;
+        m_first_calc = false;
     }
     else {
-        uint16_t diff = (rawCadence >= m_lastCrankCount) ?
-            (rawCadence - m_lastCrankCount) :
-            (65535 - m_lastCrankCount + rawCadence + 1);
-        long long dt = now - m_lastCrankTime;
+        uint16_t rev_diff = current_revs - m_prev_revs;
+        if (rev_diff > 0) {
+            std::chrono::duration<double> time_diff = now - m_prev_time;
+            double seconds = time_diff.count();
 
-        if (diff > 0 && dt > 0) {
-            instCadence = (uint16_t)((diff * 60000) / dt);
-            if (instCadence > 200) instCadence = 200; // 异常过滤
-            m_lastCrankCount = rawCadence;
-            m_lastCrankTime = now;
+            if (seconds > 0) {
+                double rpm = (rev_diff / seconds) * 60.0;
+                if (rpm < 250) {
+                    currentRpm = rpm;
+                }
+            }
+            m_prev_revs = current_revs;
+            m_prev_time = now;
         }
-        else if (dt > 2500) {
-            instCadence = 0; // 超时归零
+        else {
+            std::chrono::duration<double> idle_time = now - m_prev_time;
+            if (idle_time.count() > 2.5) {
+                currentRpm = 0.0;
+            }
+            else {
+                currentRpm = m_displayCadence;
+            }
         }
     }
 
-    // 更新显示缓存
+    // --- C. 更新显示缓存 ---
     m_displayPower = instPower;
-    m_displayCadence = instCadence;
     m_displayAngle = angle;
+    m_displayCadence = (int)currentRpm;
 
-    // 左右平衡
+    // 左右平衡计算
     int totalLR = std::abs(leftPower) + std::abs(rightPower);
     if (totalLR > 0) {
         m_displayLBalance = (std::abs(leftPower) * 100) / totalLR;
         m_displayRBalance = 100 - m_displayLBalance;
     }
+    else {
+        m_displayLBalance = 0;
+        m_displayRBalance = 0;
+    }
 
-    // 统计
+    // --- D. 统计数据更新 ---
     if (instPower > m_maxPower) m_maxPower = instPower;
-    m_sumPower += instPower; m_powerSampleCount++;
-    if (instCadence > 0) { m_sumCadence += instCadence; m_cadenceSampleCount++; }
+    m_sumPower += instPower;
+    m_powerSampleCount++;
+
+    if (m_displayCadence > 0) {
+        m_sumCadence += m_displayCadence;
+        m_cadenceSampleCount++;
+    }
 }
 
 // ---------------------------------------------------------
 // 2. 标准蓝牙功率计解析 (CPS)
 // ---------------------------------------------------------
 void XdsMonitor::parseStdPowerData(const uint8_t* data, int len) {
-    // 格式: Flags(2B) + Power(2B) + [Balance(1B)] + [Crank(2B+2B)] ...
     if (len < 4) return;
 
     uint16_t flags = getUnsignedValue(data, 0);
     int16_t power = getSignedValue(data, 2);
     int offset = 4;
 
-    // Flag Bit 0: Pedal Power Balance Present
     if (flags & 0x0001) {
         uint8_t balanceRaw = data[offset];
-        // 标准定义: 1/2% unit. 暂简单处理为百分比
-        m_displayRBalance = (int)(balanceRaw * 0.5); // 通常值是右腿百分比 * 2
+        m_displayRBalance = (int)(balanceRaw * 0.5);
         m_displayLBalance = 100 - m_displayRBalance;
         offset += 1;
     }
@@ -327,24 +345,8 @@ void XdsMonitor::parseStdPowerData(const uint8_t* data, int len) {
         m_displayLBalance = 0; m_displayRBalance = 0;
     }
 
-    // Flag Bit 1: Accumulated Torque (Not used here) -> offset += 2
-    // Flag Bit 2: Wheel Revolution (Not used here) -> offset += 6
-
-    // Flag Bit 5: Crank Revolution Data Present (用于算踏频)
-    // 注意: 要准确跳过前面的字段需要完整解析 Flags，这里做个简化假设:
-    // 如果没有 PedalBalance，通常 Power 后紧接的就是扩展数据，但这不严谨。
-    // 很多单边功率计不发 Balance，但发 Crank Data。
-    // 简单的标准顺序检测: 
-    // Offset calc: 2(Flags) + 2(Power)
-    // if bit0: +1
-    // if bit1: +2
-    // if bit2: +6 (4 Cumulative Wheel + 2 Last Wheel Time)
-    // if bit3: +4 (Extreme Magnitudes) ...
-    // 为简化代码，此处只解析功率。若需踏频，通常需更严谨的 Flags 解析。
-
     m_displayPower = power;
 
-    // 更新统计
     if (power > m_maxPower) m_maxPower = power;
     m_sumPower += power; m_powerSampleCount++;
 }
@@ -357,7 +359,6 @@ void XdsMonitor::parseHeartRateData(const uint8_t* data, int len) {
     uint8_t flags = data[0];
     uint16_t hrValue = 0;
 
-    // Bit 0: 0=uint8, 1=uint16
     if (flags & 0x01) {
         if (len >= 3) hrValue = getUnsignedValue(data, 1);
     }
@@ -376,24 +377,20 @@ void XdsMonitor::parseCscData(const uint8_t* data, int len) {
     uint8_t flags = data[0];
     int offset = 1;
 
-    // Bit 0: Wheel Rev Data Present
     if (flags & 0x01) {
-        offset += 6; // uint32 cumWheel + uint16 lastWheelTime
+        offset += 6;
     }
 
-    // Bit 1: Crank Rev Data Present
     if (flags & 0x02) {
         if (len < offset + 4) return;
         uint16_t cumCrank = getUnsignedValue(data, offset);
-        uint16_t lastCrankEvent = getUnsignedValue(data, offset + 2); // unit: 1/1024s
+        uint16_t lastCrankEvent = getUnsignedValue(data, offset + 2);
 
-        // 踏频算法 (CSCP 的时间单位是 1/1024 秒)
-        long long now = millis();
         uint16_t instCadence = 0;
 
         if (m_firstPacket) {
             m_lastCrankCount = cumCrank;
-            m_lastCrankTime = lastCrankEvent; // 这里存的是协议时间
+            m_lastCrankTime = lastCrankEvent;
             m_firstPacket = false;
         }
         else {
@@ -406,15 +403,10 @@ void XdsMonitor::parseCscData(const uint8_t* data, int len) {
                 (65535 - m_lastCrankTime + lastCrankEvent + 1);
 
             if (diffCount > 0 && diffTimeProto > 0) {
-                // RPM = (Count * 1024 * 60) / Time_units
-                // 简化: (Count * 61440) / Time
                 instCadence = (uint16_t)((diffCount * 61440) / diffTimeProto);
-
                 m_lastCrankCount = cumCrank;
                 m_lastCrankTime = lastCrankEvent;
             }
-
-            // 超时检测需要用系统时间辅助，这里略过复杂实现，仅做简单计算
         }
         m_displayCadence = instCadence;
         if (instCadence > 0) { m_sumCadence += instCadence; m_cadenceSampleCount++; }
@@ -429,22 +421,20 @@ void XdsMonitor::refreshDisplay() {
     std::cout << "\r\033[K"; // 清行
 
     long long elapsedMs = millis() - m_startTime;
-    int mins = elapsedMs / 60000;
-    int secs = (elapsedMs % 60000) / 1000;
-    int avgPower = (m_powerSampleCount > 0) ? (m_sumPower / m_powerSampleCount) : 0;
-    int avgCad = (m_cadenceSampleCount > 0) ? (m_sumCadence / m_cadenceSampleCount) : 0;
+    int mins = (int)(elapsedMs / 60000);
+    int secs = (int)((elapsedMs % 60000) / 1000);
+
 
     std::cout << "["
         << std::right << std::setw(2) << std::setfill('0') << mins << ":"
         << std::setw(2) << std::setfill('0') << secs << "] "
         << std::setfill(' ');
 
-    // 根据设备类型显示不同内容
     switch (m_currentType) {
     case DeviceType::XDS_POWER:
     case DeviceType::STD_POWER:
-        std::cout << "PWR:" << std::setw(3) << m_displayPower << "/"
-            << std::setw(3) << avgPower << "W "
+ 
+        std::cout << "PWR:" << std::setw(3) << m_displayPower << "W "
             << "CAD:" << std::setw(3) << m_displayCadence << " "
             << "L/R:" << m_displayLBalance << "/" << m_displayRBalance << "%";
         if (m_currentType == DeviceType::XDS_POWER) {
@@ -454,12 +444,12 @@ void XdsMonitor::refreshDisplay() {
 
     case DeviceType::HEART_RATE:
         std::cout << "❤️ HR: " << std::setw(3) << m_displayHeartRate << " bpm "
-            << " " << "" << ""; // 不统计最大心率
+            << " " << "" << "";
         break;
 
     case DeviceType::CSC_SENSOR:
-        std::cout << "CAD:" << std::setw(3) << m_displayCadence << "/"
-            << std::setw(3) << avgCad << " rpm";
+
+        std::cout << "CAD:" << std::setw(3) << m_displayCadence << " rpm";
         break;
 
     default:
@@ -468,11 +458,6 @@ void XdsMonitor::refreshDisplay() {
 
     std::cout << std::flush;
 }
-
-// ... initAdapter, run 等函数保持结构不变，调用 scanAndSelectDevice 即可 ...
-// 为了节省篇幅，initAdapter, startMonitoring (除 onDataReceived 绑定外), run 等逻辑
-// 基本可以复用原有结构，只需确保 startMonitoring 中调用 refreshDisplay() 即可。
-// 务必记得在 startMonitoring 里把 m_firstPacket = true 重置。
 
 bool XdsMonitor::initAdapter() {
     auto adapters = SimpleBLE::Adapter::get_adapters();
@@ -485,7 +470,14 @@ void XdsMonitor::startMonitoring() {
     std::cout << "\n[3/3] 监控开始 (Ctrl+C 停止)..." << std::endl;
 
     m_startTime = millis();
+
+    // 初始化 V2.1 算法状态
+    m_first_calc = true;
+    m_prev_revs = 0;
+
+    // 重置 CSCP 兼容变量
     m_firstPacket = true;
+
     // 清空旧数据
     m_maxPower = 0; m_sumPower = 0; m_powerSampleCount = 0;
     m_sumCadence = 0; m_cadenceSampleCount = 0;

@@ -6,15 +6,16 @@
 using namespace SimpleBLE;
 
 CharacteristicBase::CharacteristicBase(const BluetoothUUID& uuid, std::vector<Descriptor>& descriptors, bool can_read,
-                                       bool can_write_request, bool can_write_command, bool can_notify,
-                                       bool can_indicate)
+    bool can_write_request, bool can_write_command, bool can_notify,
+    bool can_indicate)
     : uuid_(uuid),
-      descriptors_(descriptors),
-      can_read_(can_read),
-      can_write_request_(can_write_request),
-      can_write_command_(can_write_command),
-      can_notify_(can_notify),
-      can_indicate_(can_indicate) {}
+    descriptors_(descriptors),
+    can_read_(can_read),
+    can_write_request_(can_write_request),
+    can_write_command_(can_write_command),
+    can_notify_(can_notify),
+    can_indicate_(can_indicate) {
+}
 
 BluetoothUUID CharacteristicBase::uuid() { return uuid_; }
 

@@ -5,6 +5,7 @@
 #include <atomic>
 #include <mutex>
 #include <iostream>
+#include <chrono> // 引入 chrono 用于高精度踏频计算
 #include <simpleble/SimpleBLE.h>
 
 // 定义设备类型枚举
@@ -42,10 +43,10 @@ private:
     void onDataReceived(SimpleBLE::ByteArray bytes);
 
     // --- 各类设备的具体解析逻辑 ---
-    void parseXdsData(const uint8_t* data, int len);       // 原 XDS 解析
-    void parseStdPowerData(const uint8_t* data, int len);  // 标准功率计解析 (UUID 2A63)
-    void parseHeartRateData(const uint8_t* data, int len); // 心率解析 (UUID 2A37)
-    void parseCscData(const uint8_t* data, int len);       // 踏频解析 (UUID 2A5B)
+    void parseXdsData(const uint8_t* data, int len);       // XDS 解析 (V2.1 算法)
+    void parseStdPowerData(const uint8_t* data, int len);  // 标准功率计解析
+    void parseHeartRateData(const uint8_t* data, int len); // 心率解析
+    void parseCscData(const uint8_t* data, int len);       // 踏频解析
 
     // --- UI 显示 ---
     void refreshDisplay();
@@ -86,8 +87,13 @@ private:
     unsigned long long m_sumCadence = 0;
     uint32_t m_cadenceSampleCount = 0;
 
-    // 踏频计算辅助 (用于标准 CSCP 和 XDS)
+    // [修改] 踏频计算辅助 (适配 XDS_Monitor.cpp V2.1 算法)
+    uint16_t m_prev_revs = 0;                              // 上一次的累计转数
+    std::chrono::steady_clock::time_point m_prev_time;     // 上一次的时间点
+    bool m_first_calc = true;                              // 是否首次计算标记
+
+    // [修复] 兼容标准 CSCP 的旧变量保留 (补回 m_firstPacket)
     uint16_t m_lastCrankCount = 0;
     long long m_lastCrankTime = 0;
-    bool m_firstPacket = true;
+    bool m_firstPacket = true;                             
 };
