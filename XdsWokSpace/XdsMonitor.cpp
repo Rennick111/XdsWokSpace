@@ -181,7 +181,7 @@ bool XdsMonitor::connectDevice() {
     switch (m_currentType) {
     case DeviceType::XDS_POWER:
         m_targetServiceUUID = UUID_SVC_XDS; m_targetCharUUID = UUID_CHR_XDS_DATA;
-        std::cout << ">> 识别模式: XDS 专用协议" << std::endl;
+        std::cout << ">> 识别模式: XDS 专用协议 (直读修正版)" << std::endl;
         break;
     case DeviceType::STD_POWER:
         m_targetServiceUUID = UUID_SVC_CPS; m_targetCharUUID = UUID_CHR_CPS_MEAS;
@@ -249,59 +249,34 @@ void XdsMonitor::onDataReceived(SimpleBLE::ByteArray bytes) {
 }
 
 // ---------------------------------------------------------
-// 1. XDS 协议解析 (V2.1 算法)
+// 1. XDS 协议解析 (V3.0 直读修正版)
 // ---------------------------------------------------------
 void XdsMonitor::parseXdsData(const uint8_t* data, int len) {
-    if (len < 10) return;
+    // 根据 Python 测试结果，完整包长为 11 字节
+    if (len < 11) return;
 
     // --- A. 解析基础数据 ---
+    // [0-1] 总功率
     uint16_t instPower = getUnsignedValue(data, 0);
+    // [2-3] 左功率
     int16_t leftPower = getSignedValue(data, 2);
+    // [4-5] 右功率
     int16_t rightPower = getSignedValue(data, 4);
-    int16_t angle = getSignedValue(data, 6);
-    uint16_t current_revs = getUnsignedValue(data, 8); // 累计转数
 
+    // [修正] Byte 6-7: 真实踏频 (原误判为角度)
+    int16_t realCadence = getSignedValue(data, 6);
+
+    // [修正] Byte 8-9: 角度 (原误判为圈数)
+    int16_t realAngle = getSignedValue(data, 8);
+
+    // 异常过滤
     if (instPower > 3000) instPower = 0;
+    if (realCadence < 0) realCadence = 0; // 踏频不应为负
 
-    // --- B. 踏频计算算法 ---
-    auto now = std::chrono::steady_clock::now();
-    double currentRpm = 0.0;
-
-    if (m_first_calc) {
-        m_prev_revs = current_revs;
-        m_prev_time = now;
-        m_first_calc = false;
-    }
-    else {
-        uint16_t rev_diff = current_revs - m_prev_revs;
-        if (rev_diff > 0) {
-            std::chrono::duration<double> time_diff = now - m_prev_time;
-            double seconds = time_diff.count();
-
-            if (seconds > 0) {
-                double rpm = (rev_diff / seconds) * 60.0;
-                if (rpm < 250) {
-                    currentRpm = rpm;
-                }
-            }
-            m_prev_revs = current_revs;
-            m_prev_time = now;
-        }
-        else {
-            std::chrono::duration<double> idle_time = now - m_prev_time;
-            if (idle_time.count() > 2.5) {
-                currentRpm = 0.0;
-            }
-            else {
-                currentRpm = m_displayCadence;
-            }
-        }
-    }
-
-    // --- C. 更新显示缓存 ---
+    // --- B. 更新显示缓存 (直接赋值，无需算法) ---
     m_displayPower = instPower;
-    m_displayAngle = angle;
-    m_displayCadence = (int)currentRpm;
+    m_displayCadence = (int)realCadence;
+    m_displayAngle = (int)realAngle;
 
     // 左右平衡计算
     int totalLR = std::abs(leftPower) + std::abs(rightPower);
@@ -314,7 +289,7 @@ void XdsMonitor::parseXdsData(const uint8_t* data, int len) {
         m_displayRBalance = 0;
     }
 
-    // --- D. 统计数据更新 ---
+    // --- C. 统计数据更新 ---
     if (instPower > m_maxPower) m_maxPower = instPower;
     m_sumPower += instPower;
     m_powerSampleCount++;
@@ -433,7 +408,7 @@ void XdsMonitor::refreshDisplay() {
     switch (m_currentType) {
     case DeviceType::XDS_POWER:
     case DeviceType::STD_POWER:
- 
+
         std::cout << "PWR:" << std::setw(3) << m_displayPower << "W "
             << "CAD:" << std::setw(3) << m_displayCadence << " "
             << "L/R:" << m_displayLBalance << "/" << m_displayRBalance << "%";
